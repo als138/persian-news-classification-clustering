@@ -1,0 +1,19 @@
+# Persian News Classification - Part 1
+# Data & preprocessing
+pandas>=2.0.0
+numpy>=1.24.0
+hazm>=0.9.0
+
+# TF-IDF & SVM (Baseline)
+scikit-learn>=1.3.0
+
+# ParsBERT (State-of-the-Art)
+transformers>=4.30.0
+torch>=2.0.0
+
+# Evaluation & visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Kaggle API (optional, for dataset download)
+kaggle>=1.5.0
