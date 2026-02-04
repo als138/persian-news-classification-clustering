@@ -1,149 +1,164 @@
-#!/usr/bin/env python3
-"""
-Part One: Persian News Text Classification
-
-Pipeline:
-1. Load data (body -> text, category from tags/category)
-2. Preprocess with hazm (Normalizer, stopwords, Lemmatizer)
-3. Train/Test split 80/20
-4. Baseline: TF-IDF + SVM (linear kernel)
-5. SOTA: ParsBERT [CLS] + Logistic Regression
-6. Evaluate: Accuracy, F1-Score, Confusion Matrix
-
-Usage:
-    python train_classifier.py --data path/to/dataset.csv
-    python train_classifier.py --data path/to/dataset_folder/
-
-Dataset: https://www.kaggle.com/datasets/amirzenoozi/persian-news-dataset
-"""
-
 import argparse
-import sys
 from pathlib import Path
+from collections import Counter
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent))
-
+import pandas as pd
 import numpy as np
+
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.svm import LinearSVC
+from sklearn.metrics import classification_report, confusion_matrix
 
-from src.data_loader import load_persian_news_dataset
-from src.preprocessing import PersianTextPreprocessor
-from src.models.baseline_model import BaselineClassifier
-from src.models.sota_model import ParsBERTClassifier
-from src.evaluation import evaluate_model, plot_confusion_matrix, print_evaluation_report
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Persian News Classification - Part 1"
+RANDOM_STATE = 42
+
+
+def load_dataset(data_dir: Path):
+    csv_files = list(data_dir.glob("*.csv"))
+    if not csv_files:
+        raise FileNotFoundError("❌ No CSV file found in data directory")
+
+    df = pd.read_csv(csv_files[0])
+
+    # ===============================
+    # Explicit column mapping (FIXED)
+    # ===============================
+    label_col = "subgroup"   # or "service" for higher-level classes
+    text_col = "body"        # main news text
+
+    if label_col not in df.columns:
+        raise ValueError(f"❌ Label column '{label_col}' not found in CSV")
+
+    if text_col not in df.columns:
+        raise ValueError(f"❌ Text column '{text_col}' not found in CSV")
+
+    df = df[[text_col, label_col]].dropna()
+    df.columns = ["text", "label"]
+
+    return df
+
+
+def clean_rare_classes(df: pd.DataFrame, min_samples: int = 2):
+    counts = Counter(df["label"])
+    valid_labels = {c for c, n in counts.items() if n >= min_samples}
+
+    removed = set(counts.keys()) - valid_labels
+    if removed:
+        print(f"⚠️ Removing rare classes (<{min_samples} samples): {removed}")
+
+    df = df[df["label"].isin(valid_labels)].copy()
+    return df
+
+
+def can_stratify(y):
+    return min(Counter(y).values()) >= 2
+
+
+def plot_confusion(y_true, y_pred, labels, out_path: Path):
+    cm = confusion_matrix(y_true, y_pred, labels=labels)
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        xticklabels=labels,
+        yticklabels=labels
     )
-    parser.add_argument(
-        "--data",
-        type=str,
-        required=True,
-        help="Path to dataset CSV or folder containing CSV files",
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    plt.title("Confusion Matrix")
+    plt.tight_layout()
+    plt.savefig(out_path)
+    plt.close()
+
+
+def run_baseline(df: pd.DataFrame, output_dir: Path):
+    X = df["text"].values
+    y = df["label"].values
+
+    stratify = y if can_stratify(y) else None
+    if stratify is None:
+        print("⚠️ Stratified split disabled (some classes have < 2 samples)")
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.2,
+        random_state=RANDOM_STATE,
+        stratify=stratify
     )
-    parser.add_argument(
-        "--output-dir",
-        type=str,
-        default="outputs",
-        help="Directory for saving confusion matrices and reports",
+
+    vectorizer = TfidfVectorizer(
+        max_features=50_000,
+        ngram_range=(1, 2),
+        min_df=2
     )
-    parser.add_argument(
-        "--test-size",
-        type=float,
-        default=0.2,
-        help="Test set fraction (default: 0.2)",
+
+    X_train_vec = vectorizer.fit_transform(X_train)
+    X_test_vec = vectorizer.transform(X_test)
+
+    clf = LinearSVC()
+    clf.fit(X_train_vec, y_train)
+
+    y_pred = clf.predict(X_test_vec)
+
+    report = classification_report(
+        y_test,
+        y_pred,
+        zero_division=0
     )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        help="Random seed for reproducibility",
+
+    print("\n📊 Classification Report:\n")
+    print(report)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    (output_dir / "classification_report.txt").write_text(report)
+
+    labels = sorted(set(y))
+    plot_confusion(
+        y_test,
+        y_pred,
+        labels,
+        output_dir / "confusion_matrix.png"
     )
-    parser.add_argument(
-        "--skip-sota",
-        action="store_true",
-        help="Skip ParsBERT model (faster, for testing)",
-    )
-    return parser.parse_args()
+
+    print(f"✅ Baseline results saved to: {output_dir}")
 
 
 def main():
-    args = parse_args()
-    
-    print("Loading Persian News Dataset...")
-    df = load_persian_news_dataset(args.data)
-    print(f"Loaded {len(df)} samples")
-    
-    # Encode labels
-    le = LabelEncoder()
-    y = le.fit_transform(df["label"])
-    class_names = list(le.classes_)
-    print(f"Classes: {class_names}")
-    
-    # Split 80/20
-    X_train, X_test, y_train, y_test = train_test_split(
-        df["body"].tolist(),
-        y,
-        test_size=args.test_size,
-        random_state=args.seed,
-        stratify=None if len(class_names) < 2 else y,
-    )
-    print(f"Train: {len(X_train)}, Test: {len(X_test)}")
-    
-    # Preprocessing with hazm
-    print("\nPreprocessing with hazm (Normalizer, stopwords, Lemmatizer)...")
-    preprocessor = PersianTextPreprocessor()
-    X_train_preprocessed = preprocessor.preprocess_batch(X_train)
-    X_test_preprocessed = preprocessor.preprocess_batch(X_test)
-    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data", type=str, required=True, help="Path to data directory")
+    parser.add_argument("--output-dir", type=str, default="outputs")
+    parser.add_argument("--skip-sota", action="store_true", help="Skip ParsBERT model")
+
+    args = parser.parse_args()
+
+    data_dir = Path(args.data)
     output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # --- Baseline: TF-IDF + SVM ---
-    print("\n" + "="*50)
-    print("Training Baseline Model (TF-IDF + SVM linear kernel)")
-    print("="*50)
-    baseline = BaselineClassifier()
-    baseline.fit(X_train_preprocessed, y_train)
-    y_pred_baseline = baseline.predict(X_test_preprocessed)
-    
-    metrics_baseline = evaluate_model(y_test, y_pred_baseline)
-    print_evaluation_report(metrics_baseline, "Baseline (TF-IDF + SVM)")
-    
-    plot_confusion_matrix(
-        y_test,
-        y_pred_baseline,
-        class_names,
-        title="Baseline (TF-IDF + SVM) - Confusion Matrix",
-        save_path=str(output_dir / "confusion_matrix_baseline.png"),
-    )
-    
-    # --- SOTA: ParsBERT + Logistic Regression ---
+
+    print("📥 Loading dataset...")
+    df = load_dataset(data_dir)
+
+    print(f"Initial dataset size: {len(df)}")
+
+    df = clean_rare_classes(df, min_samples=2)
+
+    print(f"Dataset size after cleaning: {len(df)}")
+    print("Class distribution:")
+    print(df["label"].value_counts())
+
+    print("\n🚀 Running baseline TF-IDF + LinearSVC model...")
+    run_baseline(df, output_dir)
+
     if not args.skip_sota:
-        print("\n" + "="*50)
-        print("Training SOTA Model (ParsBERT + Logistic Regression)")
-        print("="*50)
-        # Use raw text for BERT (no hazm preprocessing - BERT tokenizer handles it)
-        sota = ParsBERTClassifier()
-        sota.fit(X_train, y_train)  # Raw text for BERT
-        y_pred_sota = sota.predict(X_test)
-        
-        metrics_sota = evaluate_model(y_test, y_pred_sota)
-        print_evaluation_report(metrics_sota, "SOTA (ParsBERT + LR)")
-        
-        plot_confusion_matrix(
-            y_test,
-            y_pred_sota,
-            class_names,
-            title="SOTA (ParsBERT + Logistic Regression) - Confusion Matrix",
-            save_path=str(output_dir / "confusion_matrix_sota.png"),
-        )
-    
-    print("\nDone.")
+        print("\nℹ️ SOTA (ParsBERT) part is not implemented in this script.")
+        print("ℹ️ Use --skip-sota for now or integrate SOTA separately.")
 
 
 if __name__ == "__main__":
