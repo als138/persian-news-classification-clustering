@@ -90,7 +90,7 @@ def main():
         y,
         test_size=args.test_size,
         random_state=args.seed,
-        stratify=y,
+        stratify=None if len(class_names) < 2 else y,
     )
     print(f"Train: {len(X_train)}, Test: {len(X_test)}")
     
