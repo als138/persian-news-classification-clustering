@@ -21,10 +21,21 @@ https://www.kaggle.com/datasets/amirzenoozi/persian-news-dataset
 ### Download Dataset
 
 ```bash
-# Using Kaggle API (requires ~/.kaggle/kaggle.json)
-python scripts/download_dataset.py --output data/
+# 1) Upload your kaggle.json
+from google.colab import files
+print("Upload your kaggle.json (from https://www.kaggle.com -> Account -> API)")
+uploaded = files.upload()
 
-# Or download manually from Kaggle and place CSV in data/
+# 2) move it to ~/.kaggle
+!mkdir -p ~/.kaggle
+!mv kaggle.json ~/.kaggle/
+!chmod 600 ~/.kaggle/kaggle.json
+
+# 3) Download and unzip the dataset
+!pip install -q kaggle
+!kaggle datasets download -d amirzenoozi/persian-news-dataset -p data/ --unzip
+!ls -lh data
+
 ```
 
 ---
@@ -45,16 +56,40 @@ Given news body text, predict subject category (sports, economics, politics, etc
 ### Setup
 
 ```bash
-pip install -r requirements.txt
+# 1. Clone the repo
+!git clone https://github.com/als138/persian-news-classification-clustering.git
+%cd persian-news-classification-clustering
+
+# 2. Quick GPU check
+import torch, os, sys
+print("torch version:", torch.__version__)
+print("cuda available:", torch.cuda.is_available())
+!nvidia-smi || true
+```
+
+```bash
+!pip install -r requirements.txt
 ```
 
 ### Run
 
 ```bash
-python train_classifier.py --data data/your_dataset.csv
-# or
-python train_classifier.py --data data/  # auto-detect CSV in folder
-```
+#baseline
+!python train_baseline.py \
+  --data data/ \
+  --top-k 20 \
+  --output-dir /content/drive/MyDrive/persian-news/outputs_full
+
+#sota
+!python train_classifier.py \
+  --data data/ \
+  --top-k 20 \
+  --do-sample 5000 \
+  --max-length 256 \
+  --epochs 2 \
+  --per-device-batch-size 4 \
+  --grad-accum 1 \
+  --output-dir /content/drive/MyDrive/persian-news/outputs_quick```
 
 **Options:**
 - `--output-dir outputs` — Save confusion matrices
@@ -66,7 +101,7 @@ python train_classifier.py --data data/  # auto-detect CSV in folder
 - Console: Accuracy, F1 (macro), F1 (weighted)
 - `outputs/confusion_matrix_baseline.png`
 - `outputs/confusion_matrix_sota.png`
-
+- `exist: in outputs_full folder in attachment`
 ---
 
 ## Part Two: Clustering & Pattern Analysis
