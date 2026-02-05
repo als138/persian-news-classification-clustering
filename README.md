@@ -69,10 +69,47 @@ python train_classifier.py --data data/  # auto-detect CSV in folder
 
 ---
 
+## Part Two: Clustering & Pattern Analysis
+
+Unsupervised grouping of news when labels are hidden.
+
+### Steps
+- ParsBERT [CLS] embeddings (768-dim)
+- K-Means with **K = number of gold categories**
+- PCA → 2D for visualization
+- Cluster profiles: top 10 TF‑IDF terms per cluster
+- Alignment metrics vs. gold labels (purity, ARI, AMI, homogeneity, completeness, V-measure)
+
+### Run
+
+```bash
+python run_clustering.py --data data/ --output-dir outputs/clustering
+# optional flags:
+#   --sample 2000      # subsample for quicker runs
+#   --batch-size 8     # lower if GPU memory is tight
+#   --max-length 256   # adjust token length
+```
+
+### Clustering Artifacts
+- `outputs/clustering/parsbert_embeddings.npy`
+- `outputs/clustering/pca_clusters.png`
+- `outputs/clustering/cluster_profiles.md`
+- `outputs/clustering/alignment_report.md` (plus `alignment_scores.csv`, `contingency_table.csv`)
+- `outputs/clustering/summary.md`
+
+### Reporting Checklist (Deliverables)
+- **Classification Performance Analysis:** compare SVM vs. ParsBERT (accuracy/F1) and explain the winner.
+- **Error Analysis:** use confusion matrix to note overlapping categories (e.g., politics vs. economy) and why.
+- **Clustering Report:** include PCA scatter plot and top terms per cluster.
+- **Alignment Evaluation:** discuss purity / ARI / V-measure and how clusters map to true categories.
+
+---
+
 ## Project Structure
 
 ```
 ├── train_classifier.py      # Part 1 main pipeline
+├── run_clustering.py        # Part 2 clustering pipeline
 ├── requirements.txt
 ├── src/
 │   ├── data_loader.py       # Load Persian News Dataset
@@ -81,6 +118,7 @@ python train_classifier.py --data data/  # auto-detect CSV in folder
 │   └── models/
 │       ├── baseline_model.py   # TF-IDF + SVM
 │       └── sota_model.py       # ParsBERT + Logistic Regression
+│   └── clustering.py        # Embeddings -> KMeans -> PCA -> profiles & alignment
 ├── scripts/
 │   └── download_dataset.py  # Kaggle download helper
 └── outputs/                 # Generated reports
