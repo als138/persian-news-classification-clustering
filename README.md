@@ -71,10 +71,10 @@ print("cuda available:", torch.cuda.is_available())
 !pip install -r requirements.txt
 ```
 
-### Run
+### Part One: Classification Run
 
 ```bash
-#baseline
+#baseline(TF-IDF + LinearSVC)
 !python train_baseline.py \
   --data data/ \
   --top-k 20 \
@@ -101,10 +101,10 @@ print("cuda available:", torch.cuda.is_available())
 - Console: Accuracy, F1 (macro), F1 (weighted)
 - `outputs/confusion_matrix_baseline.png`
 - `outputs/confusion_matrix_sota.png`
-- `exist: in outputs_full folder in attachment`
+- `exist: in outputs folder in attachment`
 ---
-
-## Part Two: Clustering & Pattern Analysis
+```
+### Part Two: Clustering & Pattern Analysis
 
 Unsupervised grouping of news when labels are hidden.
 
