@@ -2,7 +2,7 @@
 
 Persian news classification and clustering with **hazm** preprocessing, **TF-IDF** vectorization, and **ParsBERT** — including source code and evaluation reports.
 
-## Project Overview
+## Project Overview 
 
 This project applies NLP to formal and structured Persian news texts for:
 1. **Part One (Supervised):** Topic classification using body text
@@ -71,7 +71,7 @@ print("cuda available:", torch.cuda.is_available())
 !pip install -r requirements.txt
 ```
 
-### Part One: Classification Run
+## Run
 
 ```bash
 #baseline(TF-IDF + LinearSVC)
@@ -118,11 +118,12 @@ Unsupervised grouping of news when labels are hidden.
 ### Run
 
 ```bash
-python run_clustering.py --data data/ --output-dir outputs/clustering
-# optional flags:
-#   --sample 2000      # subsample for quicker runs
-#   --batch-size 8     # lower if GPU memory is tight
-#   --max-length 256   # adjust token length
+!python run_clustering.py \
+  --data data \
+  --output-dir outputs/clustering \
+  --batch-size 8 \
+  --max-length 256 \
+  --sample 1000
 ```
 
 ### Clustering Artifacts
@@ -140,24 +141,9 @@ python run_clustering.py --data data/ --output-dir outputs/clustering
 
 ---
 
-## Project Structure
+## All executed outputs, results and matrices are available in the outputs folder.
 
-```
-├── train_classifier.py      # Part 1 main pipeline
-├── run_clustering.py        # Part 2 clustering pipeline
-├── requirements.txt
-├── src/
-│   ├── data_loader.py       # Load Persian News Dataset
-│   ├── preprocessing.py     # hazm preprocessing
-│   ├── evaluation.py        # Metrics & confusion matrix
-│   └── models/
-│       ├── baseline_model.py   # TF-IDF + SVM
-│       └── sota_model.py       # ParsBERT + Logistic Regression
-│   └── clustering.py        # Embeddings -> KMeans -> PCA -> profiles & alignment
-├── scripts/
-│   └── download_dataset.py  # Kaggle download helper
-└── outputs/                 # Generated reports
-```
+
 
 ---
 
